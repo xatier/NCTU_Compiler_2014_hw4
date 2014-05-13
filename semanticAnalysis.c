@@ -110,10 +110,20 @@ DATA_TYPE getBiggerType(DATA_TYPE dataType1, DATA_TYPE dataType2)
 
 void processProgramNode(AST_NODE *programNode)
 {
+    AST_NODE* child = programNode->child;
+    while(child) {
+        processDeclarationNode(programNode->child);
+        child = child->rightSibling;
+    }
 }
 
 void processDeclarationNode(AST_NODE* declarationNode)
 {
+    if(declarationNode->nodeType == DECLARATION_NODE) {
+        AST_NODE* child = declarationNode->child;
+        processTypeNode(child);
+        
+    }         
 }
 
 
