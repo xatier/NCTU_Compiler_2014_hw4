@@ -105,27 +105,48 @@ DATA_TYPE getBiggerType (DATA_TYPE dataType1, DATA_TYPE dataType2) {
 
 
 void processProgramNode (AST_NODE *programNode) {
+    initializeSymbolTable();
     AST_NODE *child = programNode->child;
     while (child) {
         processDeclarationNode(programNode->child);
         child = child->rightSibling;
     }
+    symbolTableEnd();
 }
 
 void processDeclarationNode(AST_NODE* declarationNode)
 {
-    if (declarationNode->nodeType == DECLARATION_NODE) {
+    if(declarationNode->nodeType == VARIABLE_DECL_LIST_NODE) {
         AST_NODE *child = declarationNode->child;
-        processTypeNode(child);
+        while(child) {
+            declareIdList(child, child->semantic_value.declSemanticValue.kind, 0);
+            child = child->rightSibling;
+        }
     }
+    else
+        declareFunction(declarationNode);
 }
 
 
 void processTypeNode (AST_NODE *idNodeAsType) {
+    SymbolTableEntry* entry = retrieveSymbol(idNodeAsType->semantic_value.identifierSemanticValue.identifierName);
+    while(entry != NULL) {
+        if(entry->attribute->attributeKind == TYPE_ATTRIBUTE)
+            break;
+        entry = entry->nextInHashTrain;
+    }
+
+    if(entry == NULL) {
+        //TODO: type not found
+    }
+    else {
+        idNodeAsType->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
+    }
 }
 
 
 void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrTypeAttribute, int ignoreArrayFirstDimSize) {
+    
 }
 
 void checkAssignOrExpr (AST_NODE *assignOrExprRelatedNode) {
