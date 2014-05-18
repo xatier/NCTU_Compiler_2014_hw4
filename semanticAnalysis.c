@@ -232,12 +232,50 @@ void checkIfStmt(AST_NODE *ifNode) {
 }
 
 void checkWriteFunction(AST_NODE *functionCallNode) {
+    SymbolTableEntry* entry;
+    entry = retrieveSymbol(id->semantic_value.identifierSemanticValue.identifierName);
+
+    while(entry != NULL) {
+        if(entry->attribute->attributeKind == VARIABLE_ATTRIBUTE)
+            break;
+        entry = entry->sameNameInOuterLevel;
+    }
+
+    if(entry != NULL) {
+        //TODO: id undeclared
+    }
+
+    functionCallNode->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
 }
 
 void checkFunctionCall (AST_NODE *functionCallNode) {
+    checkWriteFunction(functionCallNode);
+    SymbolTableEntry* formalParameter = functionCallNode->semantic_value.identifierSemanticValue.symbolTableEntry;
+    if(formalParameter == NULL)
+        return;
+
+    checkParameterPassing(formalParameter->attribute->attr.functionSignature.parameterList, functionCallNode->child->rightSibling->child);
 }
 
 void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParameter) {
+    while(formalParameter != NULL && actualParameter != NULL) {
+        if(actualParameter->nodeType == EXPR_NODE)
+            //TODO: check expr
+        else if(actualParameter->nodeType == IDENTIFIER_NODE)
+            //TODO: check id
+        else
+            //TODO: check const
+
+        formalParameter = formalParameter->next;
+        actualParameter = actualParameter->rightSibling;
+    }
+
+    if(formalParameter == NULL && actualParameter == NULL)
+        return;
+    else if(formalParameter == NULL)
+        //TODO: too many argu
+    else
+        //TODO: too few argu
 }
 
 
