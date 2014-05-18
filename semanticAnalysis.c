@@ -264,6 +264,8 @@ void checkIfStmt(AST_NODE *ifNode) {
 
 void checkWriteFunction(AST_NODE *functionCallNode) {
     SymbolTableEntry* entry;
+    int formalCount, actualCount = 0;
+    AST_NODE* actualParameter = functionCallNode->child->rightSibling->child;
     entry = retrieveSymbol(id->semantic_value.identifierSemanticValue.identifierName);
 
     while(entry != NULL) {
@@ -272,11 +274,24 @@ void checkWriteFunction(AST_NODE *functionCallNode) {
         entry = entry->sameNameInOuterLevel;
     }
 
-    if(entry != NULL) {
+    if(entry == NULL) {
         //TODO: id undeclared
+        return;
     }
 
-    functionCallNode->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
+    formalCount = entry->attribute->attr.functionSignature.parameterCount;
+    while(actualParameter != NULL) {
+        actualCount++;
+        actualParameter = actualParameter->rightSibling;
+    }
+    
+    if(formalCount < actualCount)
+        //TODO: to many argu
+    else if(formalCount > actualCount)
+        //TODO: to few argu
+    else
+        functionCallNode->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
+
 }
 
 void checkFunctionCall (AST_NODE *functionCallNode) {
@@ -290,23 +305,22 @@ void checkFunctionCall (AST_NODE *functionCallNode) {
 
 void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParameter) {
     while(formalParameter != NULL && actualParameter != NULL) {
-        if(actualParameter->nodeType == EXPR_NODE)
-            //TODO: check expr
-        else if(actualParameter->nodeType == IDENTIFIER_NODE)
+        if(actualParameter->nodeType == IDENTIFIER_NODE){
             //TODO: check id
-        else
-            //TODO: check const
+            TypeDescriptorKind* actual = actualParameter->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.kind;
+            TypeDescriptorKind* formal = formalParameter->type->kind;
+            if(actual == ARRAY_TYPE_DESCRIPTOR && formal == SCALAR_TYPE_DESCRIPTOR)
+                //TODO: Array passed to scalar parameter
+            else if(actual == SCALAR_TYPE_DESCRIPTOR && formal == ARRAY_TYPE_DESCRIPTOR)
+                //TODO: Scalar passed to array parameter
+        }
+        else{
+            //TODO: check expr or const
+        }
 
         formalParameter = formalParameter->next;
         actualParameter = actualParameter->rightSibling;
     }
-
-    if(formalParameter == NULL && actualParameter == NULL)
-        return;
-    else if(formalParameter == NULL)
-        //TODO: too many argu
-    else
-        //TODO: too few argu
 }
 
 
