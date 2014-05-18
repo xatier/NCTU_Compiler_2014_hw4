@@ -175,7 +175,10 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                 if(id->semantic_value.identifierSemanticValue.kind == ARRAY_ID) {
                     TypeDescriptor* arrayType = (TypeDescriptor*)malloc(sizeof(TypeDescriptor));
                     processDeclDimList(id, arrayType, ignoreArrayFirstDimSize);
-                    arrayType.arrayProperties.elementType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.properties.dataType;
+                    if(arrayType->properties.arrayProperties.dimension == 0)
+                        break;
+
+                    arrayType->properties.arrayProperties.elementType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.properties.dataType;
                     attribute->attr.typeDescriptor = arrayType;
                 }
                 else
@@ -352,18 +355,23 @@ void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int i
 
     while(dim != NULL) {
         if(count == 0 && ignoreFirstDimSize) {
-            typeDescriptor.properties.arrayProperties.sizeInEachDimension[count] = 0; 
+            typeDescriptor->properties.arrayProperties.sizeInEachDimension[count] = 0; 
         }
         else{
+            if(dim->semantic_value.exprSemanticValue.isConstEval == 0 || dim->dataType != INT_TYPE) {
+                //TODO: Array subscript is not an integer
+                typeDescriptor->properties.arrayProperties.dimension = 0;
+                return;
+            }
             evaluateExprValue(dim);
-            typeDescriptor.properties.arrayProperties.sizeInEachDimension[count] = dim->semantic_value.exprSemanticValue.constEvalValue.iValue;
+            typeDescriptor->properties.arrayProperties.sizeInEachDimension[count] = dim->semantic_value.exprSemanticValue.constEvalValue.iValue;
         }
 
         count++;
         dim = dim->rightSibling;
     }
 
-    typeDescriptor.properties.arrayProperties.dimension = count;
+    typeDescriptor->properties.arrayProperties.dimension = count;
 }
 
 
