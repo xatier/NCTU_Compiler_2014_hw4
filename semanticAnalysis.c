@@ -217,10 +217,33 @@ void checkAssignOrExpr (AST_NODE *assignOrExprRelatedNode) {
 }
 
 void checkWhileStmt (AST_NODE *whileNode) {
+    processExprNode(whileNode->child);
+    processBlockNode(whileNode->child->rightSibling);
 }
 
 
 void checkForStmt (AST_NODE *forNode) {
+    AST_NODE* assign1 = forNode->child->child;
+    AST_NODE* expr = forNode->child->rightSibling->child;
+    AST_NODE* assign2 = forNode->child->rightSibling->rightSibling->child;
+    AST_NODE* block = forNode->child->rightSibling->rightSibling->rightSibling;
+
+    while(assign1 != NULL) {
+        checkAssignmentStmt(assign1);
+        assign1 = assign1->rightSibling;
+    }
+
+    while(expr != NULL) {
+        processExprNode(expr);
+        expr = expr->rightSibling;
+    }
+
+    while(assign2 != NULL) {
+        checkAssignmentStmt(assign2);
+        assign2 = assign2->rightSibling;
+    }
+
+    processBlockNode(block);
 }
 
 
@@ -229,6 +252,14 @@ void checkAssignmentStmt (AST_NODE *assignmentNode) {
 
 
 void checkIfStmt(AST_NODE *ifNode) {
+    processExprNode(ifNode->child);
+    processBlockNode(ifNode->child->rightSibling);
+    AST_NODE* moreElse = ifNode->child->rightSibling->rightSibling;
+    if(moreElse->nodeType == STMT_NODE)
+        checkIfStmt(moreElse);
+    else if(moreElse->nodeType == BLOCK_NODE)
+        processBlockNode(moreElse);
+
 }
 
 void checkWriteFunction(AST_NODE *functionCallNode) {
@@ -305,6 +336,21 @@ void processConstValueNode (AST_NODE *constValueNode) {
 
 
 void checkReturnStmt (AST_NODE *returnNode) {
+    AST_NODE* parent = returnNode->parent;
+    AST_NODE* type;
+    AST_NODE* expr = returnNode->child;    
+
+    while(parent != NULL) {
+        if(parent->nodeType == DECLARATION_NODE)
+            if(parent->semantic_value.declSemanticValue.kind == FUNCTION_DECL)
+                break;
+        parent = parent->parent;
+    }
+    type = parent->child;
+    processExprNode(expr);
+
+    if(type->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.dataType != expr->dataType)
+        //TODO: Incompatible return type
 }
 
 
@@ -458,8 +504,8 @@ void declareFunction (AST_NODE *declarationNode) {
     attribute->attr.functionSignature.parameterCount = count;
     attribute->attr.functionSignature.parameterList = head;
     attribute->attr.functionSignature.returnType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.properties.dataType;
-
-    processBlockNode(block);
     
     id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
+    
+    processBlockNode(block);
 }
