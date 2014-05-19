@@ -80,8 +80,6 @@ void initializeSymbolTable (void) {
 
 void symbolTableEnd (void) {
     int i;
-    closeScope();
-    free(symbolTable.scopeDisplay);
     for(i = 0; i < HASH_TABLE_SIZE; i++)
         free(symbolTable.hashTable[i]);
 }
