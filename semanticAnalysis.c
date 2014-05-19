@@ -277,6 +277,18 @@ void checkForStmt (AST_NODE *forNode) {
 
 
 void checkAssignmentStmt (AST_NODE *assignmentNode) {
+    AST_NODE* lhs = assignmentNode->child;
+    AST_NODE* rhs = assignmentNode->child->rightSibling;
+    processVariableRValue(lhs);
+    
+    if(rhs->nodeType == EXPR_NODE)
+        processExprNode(rhs);
+    else if(rhs->nodeType == IDENTIFIER_NODE)
+        processVariableRValue(rhs);
+    else if(rhs->nodeType == STMT_NODE)
+        checkFunctionCall(rhs);
+    else
+        processConstValueNode(rhs);
 }
 
 
