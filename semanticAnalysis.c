@@ -145,7 +145,7 @@ void processProgramNode (AST_NODE *programNode) {
     initializeSymbolTable();
     AST_NODE *child = programNode->child;
     while (child) {
-        processDeclarationNode(programNode->child);
+        processDeclarationNode(child);
         child = child->rightSibling;
     }
     symbolTableEnd();
@@ -160,15 +160,20 @@ void processProgramNode (AST_NODE *programNode) {
 
 void processDeclarationNode(AST_NODE *declarationNode)
 {
+    AST_NODE *child = declarationNode->child;
+    AST_NODE *current = declarationNode;
     if (declarationNode->nodeType == VARIABLE_DECL_LIST_NODE) {
-        AST_NODE *child = declarationNode->child;
-        while (child) {
-            declareIdList(child, child->semantic_value.declSemanticValue.kind, 0);
-            child = child->rightSibling;
+        while (current) {
+            processDeclarationNode(current->child);
+            current = current->rightSibling;
         }
     }
-    else
+    else if (declarationNode->semantic_value.declSemanticValue.kind == FUNCTION_DECL) {
         declareFunction(declarationNode);
+    }
+    else if (declarationNode->semantic_value.declSemanticValue.kind == VARIABLE_DECL) {
+        declareIdList(declarationNode, declarationNode->semantic_value.declSemanticValue.kind, 0);
+    }
 }
 
 // xatier
@@ -188,14 +193,15 @@ void processTypeNode (AST_NODE *idNodeAsType) {
     }
 
     // is is one of three?
-    if (strcmp(typeName, "int")   != 0 ||
+    if (!(strcmp(typeName, "int") != 0 ||
         strcmp(typeName, "float") != 0 ||
-        strcmp(typeName, "void")  != 0) {
+        strcmp(typeName, "void")  != 0)) {
         printErrorMsgSpecial(idNodeAsType, typeName, SYMBOL_IS_NOT_TYPE);
     }
 }
 
 
+// xatier: I can't understand this Orz
 void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrTypeAttribute, int ignoreArrayFirstDimSize) {
     AST_NODE *id = declarationNode->child->rightSibling;
     processTypeNode(declarationNode->child);
@@ -277,6 +283,9 @@ void checkWhileStmt (AST_NODE *whileNode) {
 }
 
 
+// xatier
+// stmt
+//     | for ( assign_expr_list ; relop_expr_list ; assign_expr_list ) { block }
 void checkForStmt (AST_NODE *forNode) {
     AST_NODE *assign1 = forNode->child->child;
     AST_NODE *expr    = forNode->child->rightSibling->child;
@@ -302,9 +311,11 @@ void checkForStmt (AST_NODE *forNode) {
 }
 
 
+// xatier: assignment is an expression ... Orz
+// this function plays with `assign_expr_list` ...?
 void checkAssignmentStmt (AST_NODE *assignmentNode) {
-    AST_NODE* lhs = assignmentNode->child;
-    AST_NODE* rhs = assignmentNode->child->rightSibling;
+    AST_NODE *lhs = assignmentNode->child;
+    AST_NODE *rhs = assignmentNode->child->rightSibling;
     processVariableRValue(lhs);
 
     if(rhs->nodeType == EXPR_NODE)
@@ -318,7 +329,13 @@ void checkAssignmentStmt (AST_NODE *assignmentNode) {
 }
 
 
+// xatier
+// stmt
+//     | if ( relop_expr ) { block }
+//     | if ( relop_expr ) ;
+//     | if ( relop_expr ) { block } else stmt
 void checkIfStmt (AST_NODE *ifNode) {
+    // xatier: ignore the second case now
     processExprNode(ifNode->child);
     processBlockNode(ifNode->child->rightSibling);
     AST_NODE *moreElse = ifNode->child->rightSibling->rightSibling;
@@ -570,6 +587,8 @@ void checkReturnStmt (AST_NODE *returnNode) {
 //     | decl_list
 void processBlockNode (AST_NODE *blockNode) {
     AST_NODE *child = blockNode->child;
+    printf("processing node: %p\n", child);
+    exit(1);
     openScope();
     while (child) {
         switch (child->nodeType) {
@@ -705,10 +724,16 @@ void declareFunction (AST_NODE *declarationNode) {
     Parameter *current = NULL, *head = NULL;
     int count = 0;
 
+    // XXX: debug
+    printf("[+] function %s\n", id->semantic_value.identifierSemanticValue.identifierName);
     if (declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry == NULL)
         return;
 
     nameCheck = retrieveSymbol(id->semantic_value.identifierSemanticValue.identifierName);
+
+    // XXX: debug
+    printf("[-] function %s\n", nameCheck);
+    printf("[+] function %s\n", id->semantic_value.identifierSemanticValue.identifierName);
 
     while (nameCheck != NULL) {
         if (nameCheck->attribute->attributeKind == FUNCTION_SIGNATURE)
