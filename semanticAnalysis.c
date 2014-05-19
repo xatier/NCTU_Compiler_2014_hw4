@@ -340,7 +340,10 @@ void checkFunctionCall (AST_NODE *functionCallNode) {
 void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParameter) {
     while (formalParameter != NULL && actualParameter != NULL) {
         if (actualParameter->nodeType == IDENTIFIER_NODE) {
-            //TODO: check id
+            processVariableRValue(actualParameter);
+            if(actualParameter->semantic_value.identifierSemanticValue.symbolTableEntry == NULL)
+                continue;
+
             TypeDescriptorKind* actual = actualParameter->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.kind;
             TypeDescriptorKind* formal = formalParameter->type->kind;
             if (actual == ARRAY_TYPE_DESCRIPTOR && formal == SCALAR_TYPE_DESCRIPTOR) {
@@ -352,9 +355,13 @@ void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParamete
                 printErrorMsgSpecial(actualParameter, formalParameter->parameterName, PASS_SCALAR_TO_ARRAY);
             }
         }
-        else {
-            //TODO: check expr or const
-        }
+        else if(actualParameter->nodeType == STMT_NODE)
+            checkFunctionCall(actualParameter);
+        else if(actualParameter->nodeType == EXPR_NODE)
+            processExprNode(actualParameter);
+        else
+            processConstValueNode(actualParameter);
+            
 
         formalParameter = formalParameter->next;
         actualParameter = actualParameter->rightSibling;
@@ -373,6 +380,64 @@ void evaluateExprValue (AST_NODE *exprNode) {
 
 
 void processExprNode (AST_NODE *exprNode) {
+    AST_NODE* left = exprNode->child;
+    AST_NODE* right = exprNode->child->rightSibling;
+    DATA_TYPE leftType, rigthType;
+    int leftConst = 0, rightConst = 0;
+    exprNode->semantic_value.exprSemanricValue.isConstEval = 0;
+
+    if(left->nodeType == EXPR_NODE) {
+        processExprNode(left);
+        leftType = left->dataType;
+        leftConst = left->semantic_value.exprSemanricValue.isConstEval;
+    }
+    else if(left->nodeType == IDENTIFIER_NODE) {
+        processVariableRValue(left);
+        leftType = left->dataType;
+    }
+    else if(left->nodeType == STMT_NODE) {
+        checkFunctionCall(left);
+        leftType = left->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+    }
+    else {
+        leftConst = 1;
+        processConstValueNode(left);
+        leftType = left->dataType;
+    }    
+
+    if(right != NULL) { //exprNode->semantic_value.exprSemanticValue.kind == BINARY_OPERATION
+        if(right->nodeType == EXPR_NODE) {
+            processExprNode(right);
+            rightType = right->dataType;
+            rightConst = right->semantic_value.exprSemanricValue.isConstEval;
+        }
+        else if(right->nodeType == IDENTIFIER_NODE) {
+            processVariableRValue(right);
+            rightType = right->dataType;
+        }
+        else if(right->nodeType == STMT_NODE) {
+            checkFunctionCall(right);
+            rightType = right->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+        }
+        else {
+            rightConst = 1;
+            processConstValueNode(right);
+            rightType = right->dataType;
+        }
+    }
+
+    if(exprNode->semantic_value.exprSemanticValue.kind == UNARY_OPERATION) {
+        exprNode->dataType = leftType;
+        if(leftConst == 1) {
+            exprNode->semantic_value.exprSemanricValue.isConstEval = 1;
+        }
+    }
+    else{
+        exprNode->dataType = getBiggeType(leftType, rightType);
+        if(leftConst == 1 && rightConst == 1) {
+            exprNode->semantic_value.exprSemanricValue.isConstEval = 1;
+        }
+    }
 }
 
 
@@ -380,10 +445,62 @@ void processVariableLValue (AST_NODE *idNode) {
 }
 
 void processVariableRValue (AST_NODE *idNode) {
+    AST_NODE* entry = retrieveSymbol(idNode->semantic_value.identifierSemanticValue.identifierName);
+    if(entry == NULL) {
+        //TODO: id undeclared
+        idNode->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
+        return;
+    }
+
+    idNode->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
+
+    if(idNode->semantic_value.identifierSemanticValue.kind == ARRAY_ID) {
+        int count = 0;
+        AST_NODE* dim = idNode->child;
+        DATA_TYPE dimType;
+
+        while(dim != NULL) {
+            count++;
+            if(dim->nodeType == EXPR_NODE) {
+                processExprNode(dim);
+                dimType = dim->dataType; 
+            }
+            else if(dim->nodeType == IDENTIFIER_NODE) {
+                processVariableRValue(dim);
+                dimType = dim->dataType;
+            }
+            else if(dim->nodeType == STMT_NODE) {
+                checkFunctionCall(dim);
+                dimType = dim->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+            }
+            else {
+                processConstValueNode(dim);
+                dimType = dim->dataType;
+            }
+
+            if(dimType != INT_TYPE) {
+                //TODO: Array subscript is not an integer
+            }
+        }
+
+        if(count != entry->attribute->attr.typeDescriptor.properties.arrayProperties.dimension) {
+            //TODO: Incompatible array dimensions
+        }
+
+        idNode->dataType = entry->attribute->attr.typeDescriptor.properties.arrayProperties.elementType;
+    }
+    else{
+        idNode->dataType = entry->attribute->attr.typeDescriptor.properties.dataType;
+    }
+
 }
 
 
 void processConstValueNode (AST_NODE *constValueNode) {
+    if(constValueNode->semantic_value.const1.const_type == INTEGERC)
+        constValueNode->dataType = INT_TYPE;
+    else
+        constValueNode->dataType = FLOAT_TYPE;
 }
 
 
@@ -489,6 +606,7 @@ void processGeneralNode (AST_NODE *node) {
 
 void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int ignoreFirstDimSize) {
     AST_NODE* dim = idNode->child;
+    DATA_TYPE dimType;
     int count = 0;
 
     while(dim != NULL) {
@@ -496,14 +614,31 @@ void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int i
             typeDescriptor->properties.arrayProperties.sizeInEachDimension[count] = 0;
         }
         else {
-            if (dim->semantic_value.exprSemanticValue.isConstEval == 0 || dim->dataType != INT_TYPE) {
+            if(dim->nodeType == EXPR_NODE) {
+                processExprNode(dim);
+                dimType = dim->dataType;
+            }
+            else if(dim->nodeType == IDENTIFIER_NODE) {
+                processVariableRValue(dim);
+                dimType = dim->dataType;
+            }
+            else if(dim->nodeType == STMT_NODE) {
+                checkFunctionCall(dim);
+                dimType = dim->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+            }
+            else {
+                processConstValueNode(dim);
+                dimType = dim->dataType;
+            }
+
+            if (dimType != INT_TYPE) {
                 // array subscription is not an integer
                 printErrorMsgSpecial(idNode, ARRAY_SUBSCRIPT_NOT_INT);
                 typeDescriptor->properties.arrayProperties.dimension = 0;
                 return;
             }
-            evaluateExprValue(dim);
-            typeDescriptor->properties.arrayProperties.sizeInEachDimension[count] = dim->semantic_value.exprSemanticValue.constEvalValue.iValue;
+            //typeDescriptor->properties.arrayProperties.sizeInEachDimension[count] = dim->semantic_value.exprSemanticValue.constEvalValue.iValue;
+            typeDescriptor->properties.arrayProperties.sizeInEachDimension[count] = 256; //no need to check bound
         }
 
         count++;
