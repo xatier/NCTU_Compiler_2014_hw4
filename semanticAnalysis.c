@@ -184,6 +184,7 @@ void processDeclarationNode(AST_NODE *declarationNode)
 void processTypeNode (AST_NODE *idNodeAsType) {
     // take type as an IDNode, only allow "int", "float" and "void"
     // which is a NORMAL_ID
+    // jyhsu: typedef is allowed to be used, this won't work
 
     char *typeName = idNodeAsType->semantic_value.identifierSemanticValue.identifierName;
 
@@ -202,20 +203,22 @@ void processTypeNode (AST_NODE *idNodeAsType) {
 
 
 // xatier: I can't understand this Orz
+// second param is to make sure we delare a var or use typedef
+// third param is only for func declaration
 void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrTypeAttribute, int ignoreArrayFirstDimSize) {
     AST_NODE *id = declarationNode->child->rightSibling;
     processTypeNode(declarationNode->child);
     SymbolTableEntry *nameCheck;
     SymbolAttribute *attribute;
 
-    if (declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry == NULL)
+    if (declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry == NULL) //check type is declared
         return;
 
     while (id != NULL) {
-        nameCheck = retrieveSymbol(id->semantic_value.identifierSemanticValue.identifierName);
+        nameCheck = retrieveSymbol(id->semantic_value.identifierSemanticValue.identifierName); //check var or type name is undeclared
 
         switch (isVariableOrTypeAttribute) {
-            case VARIABLE_ATTRIBUTE:
+            case VARIABLE_ATTRIBUTE: //declare a var
                 while (nameCheck != NULL) {
                     if (nameCheck->attribute->attributeKind == VARIABLE_ATTRIBUTE)
                         break;
@@ -231,7 +234,7 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                 attribute = (SymbolAttribute*)malloc(sizeof(SymbolAttribute));
                 attribute->attributeKind = isVariableOrTypeAttribute;
 
-                if (id->semantic_value.identifierSemanticValue.kind == ARRAY_ID) {
+                if (id->semantic_value.identifierSemanticValue.kind == ARRAY_ID) { //declare array
                     TypeDescriptor *arrayType = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
                     processDeclDimList(id, arrayType, ignoreArrayFirstDimSize);
                     if(arrayType->properties.arrayProperties.dimension == 0)
@@ -240,17 +243,25 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                     arrayType->properties.arrayProperties.elementType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType;
                     attribute->attr.typeDescriptor = arrayType;
                 }
-                else
+                else //declare normal var
                     attribute->attr.typeDescriptor = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
 
                 id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
 
-                if (id->semantic_value.identifierSemanticValue.kind == WITH_INIT_ID)
-                    //checkAssignmentStmt(id->child);
+                if (id->semantic_value.identifierSemanticValue.kind == WITH_INIT_ID) { //forgot to remake this part...
+                    if(id->nodeType == EXPR_NODE)
+                        processExprNode(id->child);
+                    else if(id->nodeType == STMT_NODE)
+                        checkFunctionCall(id->child);
+                    else if(id->nodeType == IDENTIFIER_NODE)
+                        processVariableRValue(id->child);
+                    else
+                        processConstValueNode(id->child);
+                }
 
                 break;
 
-            case TYPE_ATTRIBUTE:
+            case TYPE_ATTRIBUTE: //declare a type
                 while (nameCheck != NULL) {
                     if(nameCheck->attribute->attributeKind == TYPE_ATTRIBUTE)
                         break;
@@ -313,6 +324,7 @@ void checkForStmt (AST_NODE *forNode) {
 
 // xatier: assignment is an expression ... Orz
 // this function plays with `assign_expr_list` ...?
+// jyhsu: you use it in processStmtNode so i use it
 void checkAssignmentStmt (AST_NODE *assignmentNode) {
     AST_NODE *lhs = assignmentNode->child;
     AST_NODE *rhs = assignmentNode->child->rightSibling;
