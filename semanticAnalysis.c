@@ -68,13 +68,16 @@ void printErrorMsgSpecial (AST_NODE *node1, char *name, ErrorMsgKind errorMsgKin
 
     switch (errorMsgKind) {
         case SYMBOL_UNDECLARED:
-            printf("Undeclared symbol `%s` in current scope\n", name);
+            printf("ID <%s> undeclared.\n", name);
+            break;
+        caee SYMBOL_REDECLARE:
+            printf("ID <%s> redeclared.\n", name);
             break;
         case TOO_MANY_ARGUMENTS:
-            printf("In function `%s`, too many arguments\n", name);
+            printf("too many arguments to function <%s>.\n", name);
             break;
         case TOO_FEW_ARGUMENTS:
-            printf("In function `%s`, too few arguments\n", name);
+            printf("too few arguments to function <%s>.\n", name);
             break;
         case PASS_ARRAY_TO_SCALAR:
             printf("Pass an array `%s`to a scalar parameter\n", name);
@@ -96,7 +99,7 @@ void printErrorMsg (AST_NODE *node, ErrorMsgKind errorMsgKind) {
     printf("Error found in line %d\n", node->linenumber);
     switch (errorMsgKind) {
         case RETURN_TYPE_UNMATCH:
-            printf("Return type unmatch\n");
+            printf("Incompatible return type.\n");
             break;
         default:
             printf("Unhandled case in void printErrorMsg()\n");
@@ -185,7 +188,7 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
 
                 if (nameCheck != NULL) {
                     // id redeclared
-                    printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
+                    printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_REDECLARE);
                     break;
                 }
 
@@ -220,7 +223,7 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
 
                 if (nameCheck != NULL) {
                     // id redeclared
-                    printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
+                    printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_REDECLARE);
                     break;
                 }
 
@@ -530,7 +533,7 @@ void declareFunction (AST_NODE *declarationNode) {
 
     if (nameCheck != NULL) {
         // id redeclared
-        printErrorMsgSpecial (id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED) {
+        printErrorMsgSpecial (id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_REDECLARE) {
         return;
     }
 
