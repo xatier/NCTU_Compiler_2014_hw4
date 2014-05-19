@@ -183,7 +183,6 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                     nameCheck = nameCheck->sameNameInOuterLevel;
                 }
 
-                // XXX: xatier: this should be == NULL?
                 if (nameCheck != NULL) {
                     // id redeclared
                     printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
@@ -219,7 +218,6 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                     nameCheck = nameCheck->sameNameInOuterLevel;
                 }
 
-                // XXX: xatier: this should be == NULL?
                 if (nameCheck != NULL) {
                     // id redeclared
                     printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
@@ -290,8 +288,7 @@ void checkWriteFunction (AST_NODE *functionCallNode) {
     SymbolTableEntry *entry;
     int formalCount, actualCount = 0;
     AST_NODE *actualParameter = functionCallNode->child->rightSibling->child;
-    // XXX xaiter: there's no `id`, should be `actualParameter`?
-    entry = retrieveSymbol(id->semantic_value.identifierSemanticValue.identifierName);
+    entry = retrieveSymbol(actualParameter->semantic_value.identifierSemanticValue.identifierName);
 
     while (entry != NULL) {
         if (entry->attribute->attributeKind == VARIABLE_ATTRIBUTE)
