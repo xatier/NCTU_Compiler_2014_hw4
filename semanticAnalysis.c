@@ -80,13 +80,11 @@ void printErrorMsgSpecial (AST_NODE *node1, char *name, ErrorMsgKind errorMsgKin
             printf("too few arguments to function <%s>.\n", name);
             break;
         case PASS_ARRAY_TO_SCALAR:
-            printf("Pass an array `%s`to a scalar parameter\n", name);
+            printf("Array <%s> passed to scalar parameter <%s>.\n", node1->identifierSemanticValue.identifierName, name);
             break;
         case PASS_SCALAR_TO_ARRAY:
-            printf("Pass a scalar `%s`to an array parameter\n", name);
+            printf("Scalar <%s> passed to array parameter <%s>.\n", node1->identifierSemanticValue.identifierName, name);
             break;
-        case ARRAY_SUBSCRIPT_NOT_INT:
-            printf("Subscription in array `%s` is not an integer\n", name);
         default:
             printf("Unhandled case in void printErrorMsgSpecial()\n");
             break;
@@ -99,7 +97,13 @@ void printErrorMsg (AST_NODE *node, ErrorMsgKind errorMsgKind) {
     printf("Error found in line %d\n", node->linenumber);
     switch (errorMsgKind) {
         case RETURN_TYPE_UNMATCH:
-            printf("Incompatible return type.\n");
+            puts("Incompatible return type.");
+            break;
+        case INCOMPATIBLE_ARRAY_DIMENSION:
+            puts("Incompatible array dimensions.");
+            break;
+        case ARRAY_SUBSCRIPT_NOT_INT:
+            printf("Array subscript is not an integer");
             break;
         default:
             printf("Unhandled case in void printErrorMsg()\n");
@@ -341,11 +345,11 @@ void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParamete
             TypeDescriptorKind* formal = formalParameter->type->kind;
             if (actual == ARRAY_TYPE_DESCRIPTOR && formal == SCALAR_TYPE_DESCRIPTOR) {
                 // array passed to scalar parameter
-                printErrorMsgSpecial(actualParameter, actualParameter->semantic_value.identifierSemanticValue.identifierName, PASS_ARRAY_TO_SCALAR);
+                printErrorMsgSpecial(actualParameter, formalParameter->parameterName, PASS_ARRAY_TO_SCALAR);
             }
             else if (actual == SCALAR_TYPE_DESCRIPTOR && formal == ARRAY_TYPE_DESCRIPTOR) {
                 // scalar passed to array parameter
-                printErrorMsgSpecial(actualParameter, actualParameter->semantic_value.identifierSemanticValue.identifierName, PASS_SCALAR_TO_ARRAY);
+                printErrorMsgSpecial(actualParameter, formalParameter->parameterName, PASS_SCALAR_TO_ARRAY);
             }
         }
         else {
@@ -494,7 +498,7 @@ void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int i
         else {
             if (dim->semantic_value.exprSemanticValue.isConstEval == 0 || dim->dataType != INT_TYPE) {
                 // array subscription is not an integer
-                printErrorMsgSpecial(idNode, idNode->semantic_value.identifierSemanticValue.identifierName, ARRAY_SUBSCRIPT_NOT_INT);
+                printErrorMsgSpecial(idNode, ARRAY_SUBSCRIPT_NOT_INT);
                 typeDescriptor->properties.arrayProperties.dimension = 0;
                 return;
             }
