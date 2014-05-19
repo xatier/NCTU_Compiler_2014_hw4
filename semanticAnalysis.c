@@ -70,7 +70,7 @@ void printErrorMsgSpecial (AST_NODE *node1, char *name, ErrorMsgKind errorMsgKin
         case SYMBOL_UNDECLARED:
             printf("ID <%s> undeclared.\n", name);
             break;
-        caee SYMBOL_REDECLARE:
+        case SYMBOL_REDECLARE:
             printf("ID <%s> redeclared.\n", name);
             break;
         case TOO_MANY_ARGUMENTS:
@@ -80,10 +80,10 @@ void printErrorMsgSpecial (AST_NODE *node1, char *name, ErrorMsgKind errorMsgKin
             printf("too few arguments to function <%s>.\n", name);
             break;
         case PASS_ARRAY_TO_SCALAR:
-            printf("Array <%s> passed to scalar parameter <%s>.\n", node1->identifierSemanticValue.identifierName, name);
+            printf("Array <%s> passed to scalar parameter <%s>.\n", node1->semantic_value.identifierSemanticValue.identifierName, name);
             break;
         case PASS_SCALAR_TO_ARRAY:
-            printf("Scalar <%s> passed to array parameter <%s>.\n", node1->identifierSemanticValue.identifierName, name);
+            printf("Scalar <%s> passed to array parameter <%s>.\n", node1->semantic_value.identifierSemanticValue.identifierName, name);
             break;
         default:
             printf("Unhandled case in void printErrorMsgSpecial()\n");
@@ -163,7 +163,7 @@ void processTypeNode (AST_NODE *idNodeAsType) {
         // id undeclared
         printErrorMsgSpecial (idNodeAsType,
             idNodeAsType->semantic_value.identifierSemanticValue.identifierName,
-            SYMBOL_UNDECLARED) {
+            SYMBOL_UNDECLARED);
     }
 
     idNodeAsType->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
@@ -205,11 +205,11 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                     if(arrayType->properties.arrayProperties.dimension == 0)
                         break;
 
-                    arrayType->properties.arrayProperties.elementType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.properties.dataType;
+                    arrayType->properties.arrayProperties.elementType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType;
                     attribute->attr.typeDescriptor = arrayType;
                 }
                 else
-                    attribute->attr.typeDescriptor = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor
+                    attribute->attr.typeDescriptor = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
 
                 id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
 
@@ -231,7 +231,7 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                     break;
                 }
 
-                attribute->attr.typeDescriptor = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor
+                attribute->attr.typeDescriptor = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
                 id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
                 break;
             default:
@@ -280,7 +280,7 @@ void checkAssignmentStmt (AST_NODE *assignmentNode) {
     AST_NODE* lhs = assignmentNode->child;
     AST_NODE* rhs = assignmentNode->child->rightSibling;
     processVariableRValue(lhs);
-    
+
     if(rhs->nodeType == EXPR_NODE)
         processExprNode(rhs);
     else if(rhs->nodeType == IDENTIFIER_NODE)
@@ -317,11 +317,11 @@ void checkWriteFunction (AST_NODE *functionCallNode) {
 
     if (entry == NULL) {
         // id undeclared
-        printErrorMsgSpecial(actualParameter, actualParameter->semantic_value.identifierSemanticValue.identifierName);
+        printErrorMsgSpecial(actualParameter, actualParameter->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
         return;
     }
 
-    formalCount = entry->attribute->attr.functionSignature.parameterCount;
+    formalCount = entry->attribute->attr.functionSignature->parametersCount;
     while (actualParameter != NULL) {
         actualCount++;
         actualParameter = actualParameter->rightSibling;
@@ -346,7 +346,7 @@ void checkFunctionCall (AST_NODE *functionCallNode) {
     if (formalParameter == NULL)
         return;
 
-    checkParameterPassing(formalParameter->attribute->attr.functionSignature.parameterList, functionCallNode->child->rightSibling->child);
+    checkParameterPassing(formalParameter->attribute->attr.functionSignature->parameterList, functionCallNode->child->rightSibling->child);
 }
 
 void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParameter) {
@@ -356,8 +356,8 @@ void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParamete
             if(actualParameter->semantic_value.identifierSemanticValue.symbolTableEntry == NULL)
                 continue;
 
-            TypeDescriptorKind* actual = actualParameter->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.kind;
-            TypeDescriptorKind* formal = formalParameter->type->kind;
+            TypeDescriptorKind actual = actualParameter->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->kind;
+            TypeDescriptorKind formal = formalParameter->type->kind;
             if (actual == ARRAY_TYPE_DESCRIPTOR && formal == SCALAR_TYPE_DESCRIPTOR) {
                 // array passed to scalar parameter
                 printErrorMsgSpecial(actualParameter, formalParameter->parameterName, PASS_ARRAY_TO_SCALAR);
@@ -373,7 +373,7 @@ void checkParameterPassing (Parameter *formalParameter, AST_NODE *actualParamete
             processExprNode(actualParameter);
         else
             processConstValueNode(actualParameter);
-            
+
 
         formalParameter = formalParameter->next;
         actualParameter = actualParameter->rightSibling;
@@ -394,14 +394,14 @@ void evaluateExprValue (AST_NODE *exprNode) {
 void processExprNode (AST_NODE *exprNode) {
     AST_NODE* left = exprNode->child;
     AST_NODE* right = exprNode->child->rightSibling;
-    DATA_TYPE leftType, rigthType;
+    DATA_TYPE leftType, rightType;
     int leftConst = 0, rightConst = 0;
-    exprNode->semantic_value.exprSemanricValue.isConstEval = 0;
+    exprNode->semantic_value.exprSemanticValue.isConstEval = 0;
 
     if(left->nodeType == EXPR_NODE) {
         processExprNode(left);
         leftType = left->dataType;
-        leftConst = left->semantic_value.exprSemanricValue.isConstEval;
+        leftConst = left->semantic_value.exprSemanticValue.isConstEval;
     }
     else if(left->nodeType == IDENTIFIER_NODE) {
         processVariableRValue(left);
@@ -409,19 +409,19 @@ void processExprNode (AST_NODE *exprNode) {
     }
     else if(left->nodeType == STMT_NODE) {
         checkFunctionCall(left);
-        leftType = left->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+        leftType = left->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
     }
     else {
         leftConst = 1;
         processConstValueNode(left);
         leftType = left->dataType;
-    }    
+    }
 
     if(right != NULL) { //exprNode->semantic_value.exprSemanticValue.kind == BINARY_OPERATION
         if(right->nodeType == EXPR_NODE) {
             processExprNode(right);
             rightType = right->dataType;
-            rightConst = right->semantic_value.exprSemanricValue.isConstEval;
+            rightConst = right->semantic_value.exprSemanticValue.isConstEval;
         }
         else if(right->nodeType == IDENTIFIER_NODE) {
             processVariableRValue(right);
@@ -429,7 +429,7 @@ void processExprNode (AST_NODE *exprNode) {
         }
         else if(right->nodeType == STMT_NODE) {
             checkFunctionCall(right);
-            rightType = right->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+            rightType = right->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
         }
         else {
             rightConst = 1;
@@ -441,13 +441,13 @@ void processExprNode (AST_NODE *exprNode) {
     if(exprNode->semantic_value.exprSemanticValue.kind == UNARY_OPERATION) {
         exprNode->dataType = leftType;
         if(leftConst == 1) {
-            exprNode->semantic_value.exprSemanricValue.isConstEval = 1;
+            exprNode->semantic_value.exprSemanticValue.isConstEval = 1;
         }
     }
     else{
-        exprNode->dataType = getBiggeType(leftType, rightType);
+        exprNode->dataType = getBiggerType(leftType, rightType);
         if(leftConst == 1 && rightConst == 1) {
-            exprNode->semantic_value.exprSemanricValue.isConstEval = 1;
+            exprNode->semantic_value.exprSemanticValue.isConstEval = 1;
         }
     }
 }
@@ -457,7 +457,7 @@ void processVariableLValue (AST_NODE *idNode) {
 }
 
 void processVariableRValue (AST_NODE *idNode) {
-    AST_NODE* entry = retrieveSymbol(idNode->semantic_value.identifierSemanticValue.identifierName);
+    SymbolTableEntry *entry = retrieveSymbol(idNode->semantic_value.identifierSemanticValue.identifierName);
     if(entry == NULL) {
         //TODO: id undeclared
         idNode->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
@@ -475,7 +475,7 @@ void processVariableRValue (AST_NODE *idNode) {
             count++;
             if(dim->nodeType == EXPR_NODE) {
                 processExprNode(dim);
-                dimType = dim->dataType; 
+                dimType = dim->dataType;
             }
             else if(dim->nodeType == IDENTIFIER_NODE) {
                 processVariableRValue(dim);
@@ -483,7 +483,7 @@ void processVariableRValue (AST_NODE *idNode) {
             }
             else if(dim->nodeType == STMT_NODE) {
                 checkFunctionCall(dim);
-                dimType = dim->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+                dimType = dim->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
             }
             else {
                 processConstValueNode(dim);
@@ -495,21 +495,21 @@ void processVariableRValue (AST_NODE *idNode) {
             }
         }
 
-        if(count != entry->attribute->attr.typeDescriptor.properties.arrayProperties.dimension) {
+        if(count != entry->attribute->attr.typeDescriptor->properties.arrayProperties.dimension) {
             //TODO: Incompatible array dimensions
         }
 
-        idNode->dataType = entry->attribute->attr.typeDescriptor.properties.arrayProperties.elementType;
+        idNode->dataType = entry->attribute->attr.typeDescriptor->properties.arrayProperties.elementType;
     }
     else{
-        idNode->dataType = entry->attribute->attr.typeDescriptor.properties.dataType;
+        idNode->dataType = entry->attribute->attr.typeDescriptor->properties.dataType;
     }
 
 }
 
 
 void processConstValueNode (AST_NODE *constValueNode) {
-    if(constValueNode->semantic_value.const1.const_type == INTEGERC)
+    if(constValueNode->semantic_value.const1->const_type == INTEGERC)
         constValueNode->dataType = INT_TYPE;
     else
         constValueNode->dataType = FLOAT_TYPE;
@@ -530,7 +530,7 @@ void checkReturnStmt (AST_NODE *returnNode) {
     type = parent->child;
     processExprNode(expr);
 
-    if (type->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.dataType != expr->dataType) {
+    if (type->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType != expr->dataType) {
         // incompatible return type
         printErrorMsg(returnNode, RETURN_TYPE_UNMATCH);
     }
@@ -548,7 +548,7 @@ void processBlockNode (AST_NODE *blockNode) {
     while (child) {
         switch (child->nodeType) {
             case VARIABLE_DECL_LIST_NODE:
-                declareIDList(child);
+                processDeclarationNode(child);
                 break;
             case STMT_LIST_NODE:
                 processStmtNode(child);
@@ -636,7 +636,7 @@ void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int i
             }
             else if(dim->nodeType == STMT_NODE) {
                 checkFunctionCall(dim);
-                dimType = dim->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature.returnType;
+                dimType = dim->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
             }
             else {
                 processConstValueNode(dim);
@@ -645,7 +645,7 @@ void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int i
 
             if (dimType != INT_TYPE) {
                 // array subscription is not an integer
-                printErrorMsgSpecial(idNode, ARRAY_SUBSCRIPT_NOT_INT);
+                printErrorMsg(idNode, ARRAY_SUBSCRIPT_NOT_INT);
                 typeDescriptor->properties.arrayProperties.dimension = 0;
                 return;
             }
@@ -668,7 +668,7 @@ void declareFunction (AST_NODE *declarationNode) {
     processTypeNode(declarationNode->child);
     SymbolTableEntry *nameCheck;
     SymbolAttribute *attribute;
-    Parameter* current = NULL, head = NULL;
+    Parameter *current = NULL, *head = NULL;
     int count = 0;
 
     if (declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry == NULL)
@@ -684,7 +684,7 @@ void declareFunction (AST_NODE *declarationNode) {
 
     if (nameCheck != NULL) {
         // id redeclared
-        printErrorMsgSpecial (id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_REDECLARE) {
+        printErrorMsgSpecial (id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_REDECLARE);
         return;
     }
 
@@ -693,7 +693,7 @@ void declareFunction (AST_NODE *declarationNode) {
 
     while (param != NULL) {
         count++;
-        declareIDList(param);
+        processDeclarationNode(param);
         current = (Parameter*)malloc(sizeof(Parameter));
         if (head == NULL)
             head = current;
@@ -704,9 +704,9 @@ void declareFunction (AST_NODE *declarationNode) {
         current = current->next;
     }
 
-    attribute->attr.functionSignature.parameterCount = count;
-    attribute->attr.functionSignature.parameterList = head;
-    attribute->attr.functionSignature.returnType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor.properties.dataType;
+    attribute->attr.functionSignature->parametersCount = count;
+    attribute->attr.functionSignature->parameterList = head;
+    attribute->attr.functionSignature->returnType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType;
 
     id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
 
