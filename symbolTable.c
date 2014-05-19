@@ -31,14 +31,14 @@ SymbolTableEntry *newSymbolTableEntry (int nestingLevel) {
 }
 
 
-void removeFromHashTrain (int hashIndex, SymbolTableEntry *entry) {
+void removeFromHashChain (int hashIndex, SymbolTableEntry *entry) {
     //XXX: What the heck is this function meant for!?
     // xatier: maybe remove entries that won't be used anymore?
     //         free some resource, be good to our planet.
 }
 
 
-void enterIntoHashTrain (int hashIndex, SymbolTableEntry *entry) {
+void enterIntoHashChain (int hashIndex, SymbolTableEntry *entry) {
     SymbolTableEntry *current = symbolTable.hashTable[hashIndex];
     SymbolTableEntry *outerLevel = retrieveSymbol(entry->name);
     SymbolTableEntry *scope = symbolTable.scopeDisplay[entry->nestingLevel];
@@ -48,21 +48,21 @@ void enterIntoHashTrain (int hashIndex, SymbolTableEntry *entry) {
     entry->sameNameInOuterLevel = outerLevel;
     scope->nextInSameLevel = entry;
     while (current != NULL) {
-        if (current->nextInHashTrain == NULL) {
-            entry->nextInHashTrain = current->nextInHashTrain;
-            current->nextInHashTrain->prevInHashTrain = entry;
-            current->nextInHashTrain = entry;
-            entry->prevInHashTrain = current;
+        if (current->nextInHashChain == NULL) {
+            entry->nextInHashChain = current->nextInHashChain;
+            current->nextInHashChain->prevInHashChain = entry;
+            current->nextInHashChain = entry;
+            entry->prevInHashChain = current;
             break;
         }
-        else if (current->nextInHashTrain->nestingLevel <= entry->nestingLevel) {
-            entry->nextInHashTrain = current->nextInHashTrain;
-            current->nextInHashTrain->prevInHashTrain = entry;
-            current->nextInHashTrain = entry;
-            entry->prevInHashTrain = current;
+        else if (current->nextInHashChain->nestingLevel <= entry->nestingLevel) {
+            entry->nextInHashChain = current->nextInHashChain;
+            current->nextInHashChain->prevInHashChain = entry;
+            current->nextInHashChain = entry;
+            entry->prevInHashChain = current;
             break;
         }
-        current = current->nextInHashTrain;
+        current = current->nextInHashChain;
     }
 }
 
@@ -94,7 +94,7 @@ SymbolTableEntry *retrieveSymbol (char *symbolName) {
     while (current != NULL) {
         if (strcmp(current->name, symbolName) == 0)
             return current;
-        current = current->nextInHashTrain;
+        current = current->nextInHashChain;
     }
     return NULL;
 }
