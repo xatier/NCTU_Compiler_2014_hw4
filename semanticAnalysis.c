@@ -85,6 +85,9 @@ void printErrorMsgSpecial (AST_NODE *node1, char *name, ErrorMsgKind errorMsgKin
         case PASS_SCALAR_TO_ARRAY:
             printf("Scalar <%s> passed to array parameter <%s>.\n", node1->semantic_value.identifierSemanticValue.identifierName, name);
             break;
+        case SYMBOL_IS_NOT_TYPE:
+            printf("Type <%s> is not a valid type", name);
+            break;
         default:
             printf("Unhandled case in void printErrorMsgSpecial()\n");
             break;
@@ -126,6 +129,17 @@ DATA_TYPE getBiggerType (DATA_TYPE dataType1, DATA_TYPE dataType2) {
     }
 }
 
+// xatier
+// program
+//     : global_decl_list
+//     |
+//     ;
+//
+//
+// global_decl_list
+//     : global_decl_list global_decl
+//     | global_decl
+//     ;
 
 void processProgramNode (AST_NODE *programNode) {
     initializeSymbolTable();
@@ -136,6 +150,13 @@ void processProgramNode (AST_NODE *programNode) {
     }
     symbolTableEnd();
 }
+
+
+// xatier
+// global_decl
+//     : decl_list function_decl
+//     | function_decl
+//     ;
 
 void processDeclarationNode(AST_NODE *declarationNode)
 {
@@ -150,23 +171,28 @@ void processDeclarationNode(AST_NODE *declarationNode)
         declareFunction(declarationNode);
 }
 
-
+// xatier
+// type
+//     : INT
+//     | FLOAT
+//     ;
 void processTypeNode (AST_NODE *idNodeAsType) {
-    SymbolTableEntry *entry = retrieveSymbol(idNodeAsType->semantic_value.identifierSemanticValue.identifierName);
-    while (entry != NULL) {
-        if (entry->attribute->attributeKind == TYPE_ATTRIBUTE)
-            break;
-        entry = entry->sameNameInOuterLevel;
+    // take type as an IDNode, only allow "int", "float" and "void"
+    // which is a NORMAL_ID
+
+    char *typeName = idNodeAsType->semantic_value.identifierSemanticValue.identifierName;
+
+    // is it a NORMAL_ID?
+    if (idNodeAsType->semantic_value.identifierSemanticValue.kind != NORMAL_ID) {
+        printErrorMsgSpecial(idNodeAsType, typeName, SYMBOL_IS_NOT_TYPE);
     }
 
-    if (entry == NULL) {
-        // id undeclared
-        printErrorMsgSpecial (idNodeAsType,
-            idNodeAsType->semantic_value.identifierSemanticValue.identifierName,
-            SYMBOL_UNDECLARED);
+    // is is one of three?
+    if (strcmp(typeName, "int")   != 0 ||
+        strcmp(typeName, "float") != 0 ||
+        strcmp(typeName, "void")  != 0) {
+        printErrorMsgSpecial(idNodeAsType, typeName, SYMBOL_IS_NOT_TYPE);
     }
-
-    idNodeAsType->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
 }
 
 
@@ -661,6 +687,14 @@ void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int i
 }
 
 
+// xatier
+//
+// function_decl
+//     : type ID ( param_list ) { block }
+//     | VOID ID ( param_list ) { block }
+//     | type ID ( ) { block }
+//     | VOID ID ( ) { block }
+//     ;
 void declareFunction (AST_NODE *declarationNode) {
     AST_NODE *id    = declarationNode->child->rightSibling;
     AST_NODE *param = declarationNode->child->rightSibling->rightSibling->child;
