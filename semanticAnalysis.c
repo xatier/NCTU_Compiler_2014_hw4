@@ -514,7 +514,8 @@ void processVariableLValue (AST_NODE *idNode) {
 void processVariableRValue (AST_NODE *idNode) {
     SymbolTableEntry *entry = retrieveSymbol(idNode->semantic_value.identifierSemanticValue.identifierName);
     if(entry == NULL) {
-        //TODO: id undeclared
+        //id undeclared
+        printErrorMsgSpecial(idNode, idNode->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
         idNode->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
         return;
     }
@@ -546,12 +547,14 @@ void processVariableRValue (AST_NODE *idNode) {
             }
 
             if(dimType != INT_TYPE) {
-                //TODO: Array subscript is not an integer
+                //Array subscript is not an integer
+                printErrorMsg(idNode, ARRAY_SUBSCRIPT_NOT_INT);
             }
         }
 
         if(count != entry->attribute->attr.typeDescriptor->properties.arrayProperties.dimension) {
-            //TODO: Incompatible array dimensions
+            //Incompatible array dimensions
+            printErrorMsg(idNode, INCOMPATIBLE_ARRAY_DIMENSION);
         }
 
         idNode->dataType = entry->attribute->attr.typeDescriptor->properties.arrayProperties.elementType;
