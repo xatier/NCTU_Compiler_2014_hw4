@@ -142,7 +142,6 @@ DATA_TYPE getBiggerType (DATA_TYPE dataType1, DATA_TYPE dataType2) {
 //     ;
 
 void processProgramNode (AST_NODE *programNode) {
-    initializeSymbolTable();
     AST_NODE *child = programNode->child;
     while (child) {
         processDeclarationNode(child);
@@ -163,16 +162,19 @@ void processDeclarationNode(AST_NODE *declarationNode)
     AST_NODE *child = declarationNode->child;
     AST_NODE *current = declarationNode;
     if (declarationNode->nodeType == VARIABLE_DECL_LIST_NODE) {
-        while (current) {
-            processDeclarationNode(current->child);
-            current = current->rightSibling;
+        while (child != NULL) {
+            processDeclarationNode(child);
+            child = child->rightSibling;
         }
     }
     else if (declarationNode->semantic_value.declSemanticValue.kind == FUNCTION_DECL) {
         declareFunction(declarationNode);
     }
-    else if (declarationNode->semantic_value.declSemanticValue.kind == VARIABLE_DECL) {
+    else if (declarationNode->semantic_value.declSemanticValue.kind == VARIABLE_DECL || declarationNode->semantic_value.declSemanticValue.kind == TYPE_DECL) {
         declareIdList(declarationNode, declarationNode->semantic_value.declSemanticValue.kind, 0);
+    }
+    else if (declarationNode->semantic_value.declSemanticValue.kind == FUNCTION_PARAMETER_DECL) {
+        declareIdList(declarationNode, VARIABLE_ATTRIBUTE, 1);
     }
 }
 
@@ -185,20 +187,22 @@ void processTypeNode (AST_NODE *idNodeAsType) {
     // take type as an IDNode, only allow "int", "float" and "void"
     // which is a NORMAL_ID
     // jyhsu: typedef is allowed to be used, this won't work
-
-    char *typeName = idNodeAsType->semantic_value.identifierSemanticValue.identifierName;
-
-    // is it a NORMAL_ID?
-    if (idNodeAsType->semantic_value.identifierSemanticValue.kind != NORMAL_ID) {
-        printErrorMsgSpecial(idNodeAsType, typeName, SYMBOL_IS_NOT_TYPE);
+    // change back to original design
+    SymbolTableEntry *entry = retrieveSymbol(idNodeAsType->semantic_value.identifierSemanticValue.identifierName);
+    while (entry != NULL) {
+        if (entry->attribute->attributeKind == TYPE_ATTRIBUTE)
+            break;
+        entry = entry->sameNameInOuterLevel;
     }
 
-    // is is one of three?
-    if (!(strcmp(typeName, "int") != 0 ||
-        strcmp(typeName, "float") != 0 ||
-        strcmp(typeName, "void")  != 0)) {
-        printErrorMsgSpecial(idNodeAsType, typeName, SYMBOL_IS_NOT_TYPE);
+    if (entry == NULL) {
+        // id undeclared
+        printErrorMsgSpecial (idNodeAsType,
+            idNodeAsType->semantic_value.identifierSemanticValue.identifierName,
+            SYMBOL_UNDECLARED);
     }
+
+    idNodeAsType->semantic_value.identifierSemanticValue.symbolTableEntry = entry;
 }
 
 
@@ -210,7 +214,6 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
     processTypeNode(declarationNode->child);
     SymbolTableEntry *nameCheck;
     SymbolAttribute *attribute;
-
     if (declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry == NULL) //check type is declared
         return;
 
@@ -249,11 +252,11 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                 id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
 
                 if (id->semantic_value.identifierSemanticValue.kind == WITH_INIT_ID) { //forgot to remake this part...
-                    if(id->nodeType == EXPR_NODE)
+                    if(id->child->nodeType == EXPR_NODE)
                         processExprNode(id->child);
-                    else if(id->nodeType == STMT_NODE)
+                    else if(id->child->nodeType == STMT_NODE)
                         checkFunctionCall(id->child);
-                    else if(id->nodeType == IDENTIFIER_NODE)
+                    else if(id->child->nodeType == IDENTIFIER_NODE)
                         processVariableRValue(id->child);
                     else
                         processConstValueNode(id->child);
@@ -273,11 +276,16 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                     printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_REDECLARE);
                     break;
                 }
+                
+                attribute = (SymbolAttribute*)malloc(sizeof(SymbolAttribute));
+                attribute->attributeKind = isVariableOrTypeAttribute;
 
                 attribute->attr.typeDescriptor = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
                 id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
                 break;
             default:
+                printf("nah");
+                getchar();
                 //just in case
                 break;
         }
@@ -289,7 +297,15 @@ void checkAssignOrExpr (AST_NODE *assignOrExprRelatedNode) {
 }
 
 void checkWhileStmt (AST_NODE *whileNode) {
-    processExprNode(whileNode->child);
+    if(whileNode->child->nodeType == EXPR_NODE)
+        processExprNode(whileNode->child);
+    else if(whileNode->child->nodeType == IDENTIFIER_NODE)
+        processVariableRValue(whileNode->child);
+    else if(whileNode->child->nodeType == STMT_NODE)
+        checkFunctionCall(whileNode->child);
+    else
+        processConstValueNode(whileNode->child);
+
     processBlockNode(whileNode->child->rightSibling);
 }
 
@@ -349,12 +365,32 @@ void checkAssignmentStmt (AST_NODE *assignmentNode) {
 void checkIfStmt (AST_NODE *ifNode) {
     // xatier: ignore the second case now
     processExprNode(ifNode->child);
-    processBlockNode(ifNode->child->rightSibling);
+    AST_NODE *ifBlock = ifNode->child->rightSibling;
     AST_NODE *moreElse = ifNode->child->rightSibling->rightSibling;
-    if (moreElse->nodeType == STMT_NODE)
-        checkIfStmt(moreElse);
-    else if (moreElse->nodeType == BLOCK_NODE)
+
+    if (ifBlock->nodeType == STMT_NODE) {
+        AST_NODE *temp = Allocate(STMT_NODE);
+        temp->child = ifBlock;
+        processStmtNode(temp);
+        free(temp);
+    }
+    else if (ifBlock->nodeType == BLOCK_NODE)
+        processBlockNode(ifBlock);
+
+    if (moreElse->nodeType == STMT_NODE) {
+        if(moreElse->semantic_value.stmtSemanticValue.kind == IF_STMT)
+            checkIfStmt(moreElse);
+        else {
+            AST_NODE *temp = Allocate(STMT_NODE);
+            temp->child = moreElse;
+            processStmtNode(temp);
+            free(temp);
+        }
+            
+    }
+    else if (moreElse->nodeType == BLOCK_NODE) {
         processBlockNode(moreElse);
+    }
 
 }
 
@@ -362,17 +398,17 @@ void checkWriteFunction (AST_NODE *functionCallNode) {
     SymbolTableEntry *entry;
     int formalCount, actualCount = 0;
     AST_NODE *actualParameter = functionCallNode->child->rightSibling->child;
-    entry = retrieveSymbol(actualParameter->semantic_value.identifierSemanticValue.identifierName);
+    entry = retrieveSymbol(functionCallNode->child->semantic_value.identifierSemanticValue.identifierName);
 
     while (entry != NULL) {
-        if (entry->attribute->attributeKind == VARIABLE_ATTRIBUTE)
+        if (entry->attribute->attributeKind == FUNCTION_SIGNATURE)
             break;
         entry = entry->sameNameInOuterLevel;
     }
 
     if (entry == NULL) {
         // id undeclared
-        printErrorMsgSpecial(actualParameter, actualParameter->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
+        printErrorMsgSpecial(functionCallNode->child, functionCallNode->child->semantic_value.identifierSemanticValue.identifierName, SYMBOL_UNDECLARED);
         return;
     }
 
@@ -400,7 +436,7 @@ void checkFunctionCall (AST_NODE *functionCallNode) {
     SymbolTableEntry* formalParameter = functionCallNode->semantic_value.identifierSemanticValue.symbolTableEntry;
     if (formalParameter == NULL)
         return;
-
+    
     checkParameterPassing(formalParameter->attribute->attr.functionSignature->parameterList, functionCallNode->child->rightSibling->child);
 }
 
@@ -464,7 +500,7 @@ void processExprNode (AST_NODE *exprNode) {
     }
     else if(left->nodeType == STMT_NODE) {
         checkFunctionCall(left);
-        leftType = left->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
+        leftType = left->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
     }
     else {
         leftConst = 1;
@@ -484,7 +520,7 @@ void processExprNode (AST_NODE *exprNode) {
         }
         else if(right->nodeType == STMT_NODE) {
             checkFunctionCall(right);
-            rightType = right->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
+            rightType = right->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.functionSignature->returnType;
         }
         else {
             rightConst = 1;
@@ -578,7 +614,6 @@ void checkReturnStmt (AST_NODE *returnNode) {
     AST_NODE *parent = returnNode->parent;
     AST_NODE *type;
     AST_NODE *expr = returnNode->child;
-
     while (parent != NULL) {
         if (parent->nodeType == DECLARATION_NODE)
             if (parent->semantic_value.declSemanticValue.kind == FUNCTION_DECL)
@@ -586,7 +621,14 @@ void checkReturnStmt (AST_NODE *returnNode) {
         parent = parent->parent;
     }
     type = parent->child;
-    processExprNode(expr);
+    if(expr->nodeType == EXPR_NODE)
+        processExprNode(expr);
+    else if(expr->nodeType == IDENTIFIER_NODE)
+        processVariableRValue(expr);
+    else if(expr->nodeType == STMT_NODE)
+        checkFunctionCall(expr);
+    else
+        processConstValueNode(expr);    
 
     if (type->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType != expr->dataType) {
         // incompatible return type
@@ -602,8 +644,8 @@ void checkReturnStmt (AST_NODE *returnNode) {
 //     | decl_list
 void processBlockNode (AST_NODE *blockNode) {
     AST_NODE *child = blockNode->child;
-    printf("processing node: %p\n", child);
-    exit(1);
+    //printf("processing node: %p\n", child);
+    //exit(1);
     openScope();
     while (child) {
         switch (child->nodeType) {
@@ -740,15 +782,16 @@ void declareFunction (AST_NODE *declarationNode) {
     int count = 0;
 
     // XXX: debug
-    printf("[+] function %s\n", id->semantic_value.identifierSemanticValue.identifierName);
+    //printf("[+] function %s\n", id->semantic_value.identifierSemanticValue.identifierName);
     if (declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry == NULL)
         return;
 
     nameCheck = retrieveSymbol(id->semantic_value.identifierSemanticValue.identifierName);
 
     // XXX: debug
-    printf("[-] function %s\n", nameCheck);
-    printf("[+] function %s\n", id->semantic_value.identifierSemanticValue.identifierName);
+    //if(nameCheck != NULL)
+    //    printf("[-] function %s\n", nameCheck->name);
+    //printf("[+] function %s\n", id->semantic_value.identifierSemanticValue.identifierName);
 
     while (nameCheck != NULL) {
         if (nameCheck->attribute->attributeKind == FUNCTION_SIGNATURE)
@@ -764,25 +807,27 @@ void declareFunction (AST_NODE *declarationNode) {
 
     attribute = (SymbolAttribute*)malloc(sizeof(SymbolAttribute));
     attribute->attributeKind = FUNCTION_SIGNATURE;
-
+    openScope(); //open a scope for param to prevent from redelaration between two funcs with param in same name
     while (param != NULL) {
         count++;
         processDeclarationNode(param);
         current = (Parameter*)malloc(sizeof(Parameter));
         if (head == NULL)
             head = current;
-        current->parameterName = current->parameterName = param->child->rightSibling->semantic_value.identifierSemanticValue.identifierName;;
+        current->parameterName = param->child->rightSibling->semantic_value.identifierSemanticValue.identifierName;;
         current->next = NULL;
         current->type = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor;
         param = param->rightSibling;
         current = current->next;
     }
-
+    attribute->attr.functionSignature = (FunctionSignature *)malloc(sizeof(FunctionSignature));
     attribute->attr.functionSignature->parametersCount = count;
     attribute->attr.functionSignature->parameterList = head;
     attribute->attr.functionSignature->returnType = declarationNode->child->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType;
-
     id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
-
+    //the line above is for recursion
     processBlockNode(block);
+    closeScope(); //so we can destroy param after func declaration
+    //we also destroy the func, so re-enter it into table in global
+    id->semantic_value.identifierSemanticValue.symbolTableEntry = enterSymbol(id->semantic_value.identifierSemanticValue.identifierName, attribute);
 }

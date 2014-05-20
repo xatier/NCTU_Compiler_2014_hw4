@@ -50,7 +50,6 @@ void enterIntoHashChain (int hashIndex, SymbolTableEntry *entry) {
     while (current != NULL) {
         if (current->nextInHashChain == NULL) {
             entry->nextInHashChain = current->nextInHashChain;
-            current->nextInHashChain->prevInHashChain = entry;
             current->nextInHashChain = entry;
             entry->prevInHashChain = current;
             break;
@@ -75,6 +74,27 @@ void initializeSymbolTable (void) {
     symbolTable.scopeDisplay[0] = newSymbolTableEntry(0);
     for(i = 0; i < HASH_TABLE_SIZE; i++)
         symbolTable.hashTable[i] = newSymbolTableEntry(0);
+
+    SymbolAttribute *int1, *float1, *void1;
+    int1 = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
+    float1 = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
+    void1 = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
+    int1->attributeKind = TYPE_ATTRIBUTE;
+    float1->attributeKind = TYPE_ATTRIBUTE;
+    void1->attributeKind = TYPE_ATTRIBUTE;
+    int1->attr.typeDescriptor = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
+    float1->attr.typeDescriptor = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
+    void1->attr.typeDescriptor = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
+    int1->attr.typeDescriptor->kind = SCALAR_TYPE_DESCRIPTOR;
+    float1->attr.typeDescriptor->kind = SCALAR_TYPE_DESCRIPTOR;
+    void1->attr.typeDescriptor->kind = SCALAR_TYPE_DESCRIPTOR;
+    int1->attr.typeDescriptor->properties.dataType = INT_TYPE;
+    float1->attr.typeDescriptor->properties.dataType = FLOAT_TYPE;
+    void1->attr.typeDescriptor->properties.dataType = VOID_TYPE;
+    
+    enterSymbol(SYMBOL_TABLE_INT_NAME, int1);
+    enterSymbol(SYMBOL_TABLE_FLOAT_NAME, float1);
+    enterSymbol(SYMBOL_TABLE_VOID_NAME, void1);
 }
 
 
@@ -87,7 +107,7 @@ void symbolTableEnd (void) {
 
 SymbolTableEntry *retrieveSymbol (char *symbolName) {
     int i, index = HASH(symbolName);
-    SymbolTableEntry *current = symbolTable.hashTable[index];
+    SymbolTableEntry *current = symbolTable.hashTable[index]->nextInHashChain;
 
     while (current != NULL) {
         if (strcmp(current->name, symbolName) == 0)
@@ -100,8 +120,10 @@ SymbolTableEntry *retrieveSymbol (char *symbolName) {
 
 SymbolTableEntry *enterSymbol (char *symbolName, SymbolAttribute *attribute) {
     SymbolTableEntry *newSymbol = newSymbolTableEntry(symbolTable.currentLevel);
-    newSymbol->name = symbolName;
+    newSymbol->name = (char *)malloc(sizeof(char) * (strlen(symbolName)+1));
+    strncpy(newSymbol->name, symbolName, strlen(symbolName));
     newSymbol->attribute = attribute;
+    enterIntoHashChain(HASH(newSymbol->name), newSymbol);
     return newSymbol;
 }
 
@@ -119,7 +141,7 @@ void removeSymbol (char *symbolName) {
 
 
 int declaredLocally (char *symbolName) {
-    SymbolTableEntry *current = symbolTable.scopeDisplay[symbolTable.currentLevel];
+    SymbolTableEntry *current = symbolTable.scopeDisplay[symbolTable.currentLevel]->nextInSameLevel;
     while (current != NULL) {
         if (strcmp(current->name, symbolName) == 0)
             return 1;
