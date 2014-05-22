@@ -75,26 +75,54 @@ void initializeSymbolTable (void) {
     for(i = 0; i < HASH_TABLE_SIZE; i++)
         symbolTable.hashTable[i] = newSymbolTableEntry(0);
 
-    SymbolAttribute *int1, *float1, *void1;
+    SymbolAttribute *int1, *float1, *void1, *read, *fread, *write;
+    Parameter *w;
     int1 = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
     float1 = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
     void1 = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
+    read = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
+    fread = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
+    write = (SymbolAttribute *)malloc(sizeof(SymbolAttribute));
     int1->attributeKind = TYPE_ATTRIBUTE;
     float1->attributeKind = TYPE_ATTRIBUTE;
     void1->attributeKind = TYPE_ATTRIBUTE;
+    read->attributeKind = FUNCTION_SIGNATURE;
+    fread->attributeKind = FUNCTION_SIGNATURE;
+    write->attributeKind = FUNCTION_SIGNATURE;
     int1->attr.typeDescriptor = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
     float1->attr.typeDescriptor = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
     void1->attr.typeDescriptor = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
+    read->attr.functionSignature = (FunctionSignature *)malloc(sizeof(FunctionSignature));
+    fread->attr.functionSignature = (FunctionSignature *)malloc(sizeof(FunctionSignature));
+    write->attr.functionSignature = (FunctionSignature *)malloc(sizeof(FunctionSignature));
+    w = (Parameter *)malloc(sizeof(Parameter));
+    w->type = (TypeDescriptor *)malloc(sizeof(TypeDescriptor));
+    w->next = NULL;
+    w->type->kind = SCALAR_TYPE_DESCRIPTOR;
+    w->type->properties.dataType = VOID_TYPE;
+    w->parameterName = "yooo";
     int1->attr.typeDescriptor->kind = SCALAR_TYPE_DESCRIPTOR;
     float1->attr.typeDescriptor->kind = SCALAR_TYPE_DESCRIPTOR;
     void1->attr.typeDescriptor->kind = SCALAR_TYPE_DESCRIPTOR;
+    read->attr.functionSignature->parametersCount = 0;
+    fread->attr.functionSignature->parametersCount = 0;
+    write->attr.functionSignature->parametersCount = 1;
+    read->attr.functionSignature->parameterList = NULL;
+    fread->attr.functionSignature->parameterList = NULL;
+    write->attr.functionSignature->parameterList = w;
+    read->attr.functionSignature->returnType = INT_TYPE;
+    fread->attr.functionSignature->returnType = FLOAT_TYPE;
+    write->attr.functionSignature->returnType = VOID_TYPE;
     int1->attr.typeDescriptor->properties.dataType = INT_TYPE;
     float1->attr.typeDescriptor->properties.dataType = FLOAT_TYPE;
     void1->attr.typeDescriptor->properties.dataType = VOID_TYPE;
-    
+
     enterSymbol(SYMBOL_TABLE_INT_NAME, int1);
     enterSymbol(SYMBOL_TABLE_FLOAT_NAME, float1);
     enterSymbol(SYMBOL_TABLE_VOID_NAME, void1);
+    enterSymbol(SYMBOL_TABLE_SYS_LIB_READ, read);
+    enterSymbol(SYMBOL_TABLE_SYS_LIB_FREAD, fread);
+    enterSymbol(SYMBOL_TABLE_SYS_LIB_WRITE, write);
 }
 
 
