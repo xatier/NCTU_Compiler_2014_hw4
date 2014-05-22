@@ -276,7 +276,7 @@ void declareIdList (AST_NODE *declarationNode, SymbolAttributeKind isVariableOrT
                     printErrorMsgSpecial(id, id->semantic_value.identifierSemanticValue.identifierName, SYMBOL_REDECLARE);
                     break;
                 }
-                
+
                 attribute = (SymbolAttribute*)malloc(sizeof(SymbolAttribute));
                 attribute->attributeKind = isVariableOrTypeAttribute;
 
@@ -386,7 +386,7 @@ void checkIfStmt (AST_NODE *ifNode) {
             processStmtNode(temp);
             free(temp);
         }
-            
+
     }
     else if (moreElse->nodeType == BLOCK_NODE) {
         processBlockNode(moreElse);
@@ -433,10 +433,10 @@ void checkWriteFunction (AST_NODE *functionCallNode) {
 
 void checkFunctionCall (AST_NODE *functionCallNode) {
     checkWriteFunction(functionCallNode);
-    SymbolTableEntry* formalParameter = functionCallNode->semantic_value.identifierSemanticValue.symbolTableEntry;
+    SymbolTableEntry *formalParameter = functionCallNode->semantic_value.identifierSemanticValue.symbolTableEntry;
     if (formalParameter == NULL)
         return;
-    
+
     checkParameterPassing(formalParameter->attribute->attr.functionSignature->parameterList, functionCallNode->child->rightSibling->child);
 }
 
@@ -483,8 +483,8 @@ void evaluateExprValue (AST_NODE *exprNode) {
 
 
 void processExprNode (AST_NODE *exprNode) {
-    AST_NODE* left = exprNode->child;
-    AST_NODE* right = exprNode->child->rightSibling;
+    AST_NODE *left = exprNode->child;
+    AST_NODE *right = exprNode->child->rightSibling;
     DATA_TYPE leftType, rightType;
     int leftConst = 0, rightConst = 0;
     exprNode->semantic_value.exprSemanticValue.isConstEval = 0;
@@ -560,7 +560,7 @@ void processVariableRValue (AST_NODE *idNode) {
 
     if(idNode->semantic_value.identifierSemanticValue.kind == ARRAY_ID) {
         int count = 0;
-        AST_NODE* dim = idNode->child;
+        AST_NODE *dim = idNode->child;
         DATA_TYPE dimType;
 
         while(dim != NULL) {
@@ -628,7 +628,7 @@ void checkReturnStmt (AST_NODE *returnNode) {
     else if(expr->nodeType == STMT_NODE)
         checkFunctionCall(expr);
     else
-        processConstValueNode(expr);    
+        processConstValueNode(expr);
 
     if (type->semantic_value.identifierSemanticValue.symbolTableEntry->attribute->attr.typeDescriptor->properties.dataType != expr->dataType) {
         // incompatible return type
@@ -678,7 +678,7 @@ void processBlockNode (AST_NODE *blockNode) {
 //     | ;
 //     | return ;
 //     | return relop_expr ;
-void processStmtNode(AST_NODE* stmtNode)
+void processStmtNode(AST_NODE *stmtNode)
 {
     AST_NODE *child = stmtNode->child;
     while (child) {
@@ -719,7 +719,7 @@ void processGeneralNode (AST_NODE *node) {
 }
 
 void processDeclDimList (AST_NODE *idNode, TypeDescriptor *typeDescriptor, int ignoreFirstDimSize) {
-    AST_NODE* dim = idNode->child;
+    AST_NODE *dim = idNode->child;
     DATA_TYPE dimType;
     int count = 0;
 
